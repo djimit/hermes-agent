@@ -41,15 +41,29 @@ from typing import Optional, Sequence
 # essentially always in Hermes (TUI, gateway, ``hy_memory`` server, MCP
 # servers, and on-demand CLI commands all log from separate processes),
 # pinning ``agent.log`` at the 5 MiB threshold and spamming stderr with
-# a traceback on every emit. ``concurrent-log-handler`` wraps the
-# rename in a cross-process file lock (via ``portalocker``: pywin32 on
-# Windows, fcntl on POSIX) so only one process rotates at a time and the
-# others wait their turn.
-# Drop-in API compatibility — aliasing lets every existing
-# ``RotatingFileHandler`` reference in this module (the class declaration,
-# the ``isinstance`` checks, the docstring) keep working unchanged.
-# See #44873.
-from concurrent_log_handler import ConcurrentRotatingFileHandler as RotatingFileHandler  # noqa: E402
+# a traceback on every emit. ``concurrent-log-handler`` wraps the rename in a
+# cross-process file lock (via ``portalocker``: pywin32 on Windows) so only
+# one process rotates at a time and the others wait their turn.
+#
+# This swap is Windows-ONLY and deliberately so:
+#   * The bug (WinError 32 on rename-while-open) is specific to Windows file
+#     locking semantics — POSIX renames an open file fine, so stdlib already
+#     works correctly on Linux/macOS.
+#   * On POSIX, managed-mode (NixOS) relies on the exact ``_open()`` /
+#     ``doRollover()`` lifecycle of stdlib ``RotatingFileHandler`` (the
+#     ``_ManagedRotatingFileHandler`` subclass chmods 0660 after each). CLH
+#     opens lazily and rotates differently, which breaks the group-writable
+#     guarantee and the eager file-creation those paths depend on.
+# Aliasing keeps every existing ``RotatingFileHandler`` reference in this
+# module (class declaration, ``isinstance`` checks, docstring) working
+# unchanged. See #44873.
+if sys.platform == "win32":
+    from concurrent_log_handler import (  # noqa: E402
+        ConcurrentRotatingFileHandler as RotatingFileHandler,
+    )
+else:
+    from logging.handlers import RotatingFileHandler  # noqa: E402
+
 
 from hermes_constants import get_config_path, get_hermes_home
 
