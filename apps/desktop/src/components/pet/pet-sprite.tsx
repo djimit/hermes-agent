@@ -35,6 +35,7 @@ function PetSpriteImpl({ info, zoom = 1 }: PetSpriteProps) {
   const frameW = info.frameW ?? DEFAULT_FRAME_W
   const frameH = info.frameH ?? DEFAULT_FRAME_H
   const frames = info.framesPerState ?? DEFAULT_FRAMES
+  const framesByState = info.framesByState
   const loopMs = info.loopMs ?? DEFAULT_LOOP_MS
   const scale = (info.scale ?? DEFAULT_SCALE) * zoom
   const rows = info.stateRows ?? DEFAULT_STATE_ROWS
@@ -78,28 +79,43 @@ function PetSpriteImpl({ info, zoom = 1 }: PetSpriteProps) {
     let lastStep = performance.now()
     let drawnFrame = -1
     let drawnRow = -1
-    const stepMs = loopMs / Math.max(1, frames)
 
-    const rowIndex = (s: PetState) => {
+    const rowIndex = (s: string) => {
       const idx = rows.indexOf(s)
 
       return idx >= 0 ? idx : 0
     }
 
+    // Resolve a state to the row it draws and its real frame count. A state
+    // with no real frames (ragged sheet, empty row) falls back to idle rather
+    // than flashing blank padding.
+    const resolve = (s: PetState): { row: number; count: number } => {
+      const real = framesByState?.[s] ?? frames
+      if (real > 0) {
+        return { row: rowIndex(s), count: real }
+      }
+
+      return { row: rowIndex('idle'), count: Math.max(1, framesByState?.idle ?? frames) }
+    }
+
     const render = (now: number) => {
+      const { row, count } = resolve(stateRef.current)
+      // Per-state step keeps every state's loop ~loopMs even when frame counts
+      // differ; counts vary per row so derive the cadence here, not once.
+      const stepMs = loopMs / count
+
       if (now - lastStep >= stepMs) {
-        frame = (frame + 1) % Math.max(1, frames)
+        frame += 1
         lastStep = now
       }
 
-      const row = rowIndex(stateRef.current)
+      frame %= count
 
       // Only touch the canvas when the visible cell actually changes. The RAF
       // ticks at ~60Hz but the sprite only steps ~5Hz, so this skips ~90% of
       // the clear+draw work and keeps the main thread free.
       if ((frame !== drawnFrame || row !== drawnRow) && image.complete && image.naturalWidth > 0) {
-        const sheetCols = Math.max(1, Math.floor(image.width / frameW))
-        const sx = (frame % sheetCols) * frameW
+        const sx = frame * frameW
         const sy = row * frameH
         ctx.clearRect(0, 0, canvas.width, canvas.height)
         ctx.imageSmoothingEnabled = false
@@ -117,7 +133,7 @@ function PetSpriteImpl({ info, zoom = 1 }: PetSpriteProps) {
       cancelAnimationFrame(raf)
       unsubState()
     }
-  }, [image, frameW, frameH, frames, loopMs, drawW, drawH, rows])
+  }, [image, frameW, frameH, frames, framesByState, loopMs, drawW, drawH, rows])
 
   return (
     <canvas

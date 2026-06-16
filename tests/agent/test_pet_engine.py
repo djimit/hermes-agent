@@ -150,6 +150,44 @@ def test_renderer_decodes_frames(boba_like):
     assert r.frame_count(PetState.RUN) == constants.FRAMES_PER_STATE
 
 
+def test_trims_trailing_blank_frames(tmp_path):
+    """Ragged state rows (real frames + transparent padding) trim to real count.
+
+    petdex sheets are left-packed: a state with fewer than FRAMES_PER_STATE real
+    frames pads the trailing columns transparent. Stepping into one flashes the
+    pet blank, so the engine must stop the row at the first gap.
+    """
+    from PIL import Image
+
+    cols, rows = 8, 9
+    sheet = Image.new("RGBA", (FRAME_W * cols, FRAME_H * rows), (0, 0, 0, 0))
+    # row index → number of real (opaque) frames; the rest stay transparent.
+    real = {0: 6, 1: 8, 2: 8, 3: 4, 4: 5, 5: 8}  # idle wave run failed review jump
+    for r, k in real.items():
+        for c in range(k):
+            block = Image.new("RGBA", (FRAME_W, FRAME_H), (200, 80, 80, 255))
+            sheet.paste(block, (c * FRAME_W, r * FRAME_H))
+    sprite = tmp_path / "ragged.webp"
+    sheet.save(sprite)
+
+    r = render.PetRenderer(str(sprite), mode="unicode", scale=0.5)
+    # Full rows cap at FRAMES_PER_STATE; ragged rows trim to their real count.
+    assert r.frame_count("idle") == constants.FRAMES_PER_STATE
+    assert r.frame_count("run") == constants.FRAMES_PER_STATE
+    assert r.frame_count("failed") == 4
+    assert r.frame_count("review") == 5
+
+    # Every stepped frame is non-empty — no blank flash for the trimmed states.
+    for state in ("failed", "review"):
+        for i in range(r.frame_count(state)):
+            assert r.frame(state, i), f"{state}[{i}] rendered blank"
+
+    counts = render.state_frame_counts(str(sprite))
+    assert counts == {
+        "idle": 6, "wave": 6, "run": 6, "failed": 4, "review": 5, "jump": 6,
+    }
+
+
 @pytest.mark.parametrize("mode", ["unicode", "kitty", "iterm", "sixel"])
 def test_every_encoder_emits(boba_like, mode):
     sprite = store.load_pet("boba").spritesheet
