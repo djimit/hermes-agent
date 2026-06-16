@@ -1040,29 +1040,47 @@ class CLICommandsMixin:
             print()
 
     def _handle_pet_command(self, cmd: str):
-        """Bring out a petdex mascot (selection only — see ``/pets`` for the list).
+        """Toggle, browse, or adopt a petdex mascot.
 
-        ``/pet <slug>``  → adopt (install if needed) + make active
-        ``/pet off``     → put the pet away
-        ``/pet``         → show the active pet + a pointer to ``/pets``
+        ``/pet`` / ``/pet toggle`` → flip ``display.pet.enabled`` on/off
+        ``/pet list``            → browse the petdex gallery
+        ``/pet scale <n>``       → resize the pet everywhere (e.g. 0.5)
+        ``/pet <slug>``          → adopt (install if needed) + make active
+        ``/pet off``             → disable (alias for toggle-off)
 
         Writes ``display.pet.*`` to config; the CLI/TUI/desktop pet surfaces
         pick the change up on their next poll, so the pet appears shortly.
         """
         from agent.pet import store
         from agent.pet.manifest import ManifestError
-        from hermes_cli.pets import _pet_config, _set_active, _set_enabled
+        from hermes_cli.pets import _set_active, _set_enabled, print_pet_gallery, set_pet_scale, toggle_pet_display
 
         parts = cmd.split(maxsplit=1)
         arg = parts[1].strip() if len(parts) > 1 else ""
         low = arg.lower()
 
-        if not arg:
-            cfg = _pet_config()
-            active = store.resolve_active_pet(str(cfg.get("slug", "") or ""))
-            state = "on" if cfg.get("enabled") else "off"
-            print(f"(^_^) Pet: {state} · active: {active.display_name if active else 'none'}")
-            print("  /pet <slug> to bring one out · /pet off · /pets for your collection")
+        if not arg or low == "toggle":
+            enabled, name, err = toggle_pet_display()
+            if err:
+                print(f"(x_x) {err}")
+                return
+            if enabled:
+                print(f"(^_^)b {name} is out — it'll pop in shortly.")
+            else:
+                print(f"(-_-)zzZ {name} put away." if name else "(-_-)zzZ Pet put away.")
+            return
+
+        if low in ("list", "gallery", "browse", "all"):
+            print_pet_gallery()
+            return
+
+        if low == "scale" or low.startswith("scale "):
+            value = arg[len("scale"):].strip()
+            if not value:
+                print("(o_o) Usage: /pet scale <factor>  (e.g. /pet scale 0.5)")
+                return
+            scale, err = set_pet_scale(value)
+            print(f"(x_x) {err}" if err else f"(^_^) Pet scale → {scale:g}.")
             return
 
         if low == "off":
@@ -1078,48 +1096,6 @@ class CLICommandsMixin:
             return
         _set_active(arg)
         print(f"(^_^)b {pet.display_name} is out — it'll pop in shortly.")
-
-    def _handle_pets_command(self, cmd: str):
-        """List your pets, or browse the petdex gallery.
-
-        ``/pets``          → your installed pets (active one marked)
-        ``/pets gallery``  → browse the petdex catalog (first 20)
-        """
-        from agent.pet import store
-        from agent.pet.manifest import ManifestError, fetch_manifest
-        from hermes_cli.pets import _pet_config
-
-        parts = cmd.split(maxsplit=1)
-        arg = parts[1].strip().lower() if len(parts) > 1 else ""
-
-        if arg in ("gallery", "all", "browse"):
-            try:
-                entries = fetch_manifest()
-            except ManifestError as exc:
-                print(f"(._.) Couldn't reach the petdex gallery: {exc}")
-                return
-            installed = {p.slug for p in store.installed_pets()}
-            print(f"(^o^)/ petdex gallery — first 20 of {len(entries)}:")
-            for entry in entries[:20]:
-                mark = "●" if entry.slug in installed else "○"
-                print(f"  {mark} {entry.slug:<24} {entry.display_name}")
-            print("  /pet <slug> to bring one out")
-            return
-
-        cfg = _pet_config()
-        active = store.resolve_active_pet(str(cfg.get("slug", "") or ""))
-        active_slug = active.slug if active else ""
-        installed = store.installed_pets()
-        state = "on" if cfg.get("enabled") else "off"
-
-        print(f"(^_^) Your pets ({state}):")
-        if not installed:
-            print("  none yet — /pet boba to adopt one · /pets gallery to browse")
-            return
-        for p in installed:
-            mark = "→" if p.slug == active_slug else " "
-            print(f"  {mark} {p.slug:<24} {p.display_name}")
-        print("  /pet <slug> to switch · /pet off · /pets gallery to browse")
 
     def _handle_cron_command(self, cmd: str):
         """Handle the /cron command to manage scheduled tasks."""

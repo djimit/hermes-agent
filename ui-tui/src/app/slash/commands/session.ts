@@ -342,19 +342,18 @@ export const sessionCommands: SlashCommand[] = [
   },
 
   {
-    help: 'pick / adopt an animated pet',
+    help: 'toggle / adopt / resize an animated pet',
     name: 'pet',
-    usage: '/pet [list | <slug> | off]',
+    usage: '/pet [toggle | list | scale <n> | <slug>]',
     run: (arg, ctx, cmd) => {
       const sub = arg.trim().toLowerCase()
 
-      // No slug (or an explicit "list") → the interactive picker; the TUI can
-      // do this even though the text `/pet` path only prints. status/off/<slug>
-      // keep their text behaviour via the slash worker.
-      if (!sub || sub === 'list') {
+      // Gallery picker — the interactive browse surface.
+      if (sub === 'list') {
         return patchOverlayState({ petPicker: true })
       }
 
+      // Bare /pet and /pet toggle flip display.pet.enabled via the slash worker.
       ctx.gateway.gw
         .request<SlashExecResponse>('slash.exec', { command: cmd.slice(1), session_id: ctx.sid })
         .then(

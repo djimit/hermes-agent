@@ -4222,17 +4222,22 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin):
         self._pet_flash("jump" if done else "wave")
 
     def _derive_pet_state(self) -> str:
-        """Map current CLI activity to a pet animation state (mirrors the TUI).
+        """Map current CLI activity to a pet animation state.
 
-        A transient reaction beat wins while it's live; otherwise reasoning →
-        ``review``, an in-flight turn → ``run``, idle at rest.
+        A transient reaction beat (wave/jump/failed) wins while it's live;
+        otherwise the steady state comes from the shared
+        :func:`agent.pet.state.derive_pet_state` so the CLI can't drift from the
+        TUI/desktop priority order.
         """
         if self._pet_event and time.monotonic() < self._pet_event_until:
             return self._pet_event
         self._pet_event = ""
-        if getattr(self, "_agent_running", False):
-            return "review" if self._pet_reasoning else "run"
-        return "idle"
+        from agent.pet.state import derive_pet_state
+
+        return derive_pet_state(
+            busy=getattr(self, "_agent_running", False),
+            reasoning=self._pet_reasoning,
+        ).value
 
     def _pet_frames_for(self, state: str) -> list:
         """Return (and cache) the half-block grids for one state."""
@@ -7650,8 +7655,6 @@ class HermesCLI(CLIAgentSetupMixin, CLICommandsMixin):
             self._handle_personality_command(cmd_original)
         elif canonical == "pet":
             self._handle_pet_command(cmd_original)
-        elif canonical == "pets":
-            self._handle_pets_command(cmd_original)
         elif canonical == "retry":
             retry_msg = self.retry_last()
             if retry_msg and hasattr(self, '_pending_input'):

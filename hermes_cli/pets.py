@@ -127,6 +127,16 @@ def _cmd_off(args) -> int:
     return 0
 
 
+def _cmd_scale(args) -> int:
+    """Persist ``display.pet.scale`` — one knob resizes every surface."""
+    scale, err = set_pet_scale(args.factor)
+    if err:
+        _err(f"✗ {err}")
+        return 1
+    _print(f"✓ pet scale set to {scale:g} (display.pet.scale)")
+    return 0
+
+
 def _cmd_show(args) -> int:
     """Animate the active (or named) pet in the terminal.
 
@@ -314,6 +324,81 @@ def _set_enabled(enabled: bool) -> None:
     save_config(cfg)
 
 
+def _set_scale(scale: float) -> None:
+    from hermes_cli.config import load_config, save_config
+
+    cfg = load_config()
+    display = cfg.setdefault("display", {})
+    pet = display.setdefault("pet", {})
+    pet["scale"] = scale
+    save_config(cfg)
+
+
+def set_pet_scale(value: float | str) -> tuple[float, str | None]:
+    """Set ``display.pet.scale`` (clamped to bounds). Returns ``(applied, error)``.
+
+    The single write path behind ``/pet scale`` and the desktop slider, so every
+    surface that resolves scale from config picks it up identically. *error* is
+    set (and nothing written) only when *value* isn't a number.
+    """
+    from agent.pet.constants import clamp_scale
+
+    try:
+        scale = clamp_scale(float(value))
+    except (TypeError, ValueError):
+        return 0.0, f"not a number: {value!r} — try a value like 0.5"
+
+    _set_scale(scale)
+    return scale, None
+
+
+def toggle_pet_display() -> tuple[bool, str | None, str | None]:
+    """Toggle ``display.pet.enabled``.
+
+    Returns ``(enabled, display_name, error_message)``. *error_message* is set
+    when turning on but nothing is installed to show.
+    """
+    from agent.pet import store
+
+    cfg = _pet_config()
+    slug = str(cfg.get("slug", "") or "")
+    pet = store.resolve_active_pet(slug)
+
+    if bool(cfg.get("enabled")):
+        _set_enabled(False)
+        return False, pet.display_name if pet else None, None
+
+    if pet is None:
+        installed = store.installed_pets()
+        if not installed:
+            return False, None, "no pets installed — /pet list to browse, or /pet <slug> to adopt"
+        pet = installed[0]
+        _set_active(pet.slug)
+    else:
+        _set_enabled(True)
+    return True, pet.display_name, None
+
+
+def print_pet_gallery(*, limit: int = 20) -> None:
+    """Print a slice of the public petdex gallery (CLI/TUI text fallback)."""
+    from agent.pet import store
+    from agent.pet.manifest import ManifestError, fetch_manifest
+
+    try:
+        entries = fetch_manifest()
+    except ManifestError as exc:
+        print(f"(._.) Couldn't reach the petdex gallery: {exc}")
+        return
+
+    installed = {p.slug for p in store.installed_pets()}
+    shown = entries[:limit] if limit > 0 else entries
+    print(f"(^o^)/ petdex gallery — first {len(shown)} of {len(entries)}:")
+    for entry in shown:
+        mark = "●" if entry.slug in installed else "○"
+        print(f"  {mark} {entry.slug:<24} {entry.display_name}")
+    print("  /pet <slug> to adopt · /pet to toggle")
+
+
 def _clear_active_if(slug: str) -> bool:
     """Disable + unset the active pet iff it's ``slug`` (e.g. after removal).
 
@@ -383,6 +468,10 @@ def register_cli(parent: argparse.ArgumentParser) -> None:
     p_show.set_defaults(func=_cmd_show)
 
     subs.add_parser("off", help="Disable the pet display").set_defaults(func=_cmd_off)
+
+    p_scale = subs.add_parser("scale", help="Resize the pet everywhere (display.pet.scale)")
+    p_scale.add_argument("factor", help="Scale factor, e.g. 0.5 (clamped 0.1–3.0)")
+    p_scale.set_defaults(func=_cmd_scale)
 
     p_remove = subs.add_parser("remove", help="Delete an installed pet")
     p_remove.add_argument("slug", help="Pet slug")

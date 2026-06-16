@@ -55,6 +55,10 @@ def _make_cli():
     cli_obj._pet_frames_cache = {}
     cli_obj._pet_frame_idx = 0
     cli_obj._agent_running = False
+    # Transient-beat + reasoning state (set by HermesCLI.__init__ in production).
+    cli_obj._pet_event = ""
+    cli_obj._pet_event_until = 0.0
+    cli_obj._pet_reasoning = False
     return cli_obj
 
 
