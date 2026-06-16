@@ -22,6 +22,10 @@ export interface PetInfo {
   frameW?: number
   frameH?: number
   framesPerState?: number
+  // Real (padding-trimmed) frame count per state row, from the engine. Lets the
+  // canvas step only frames that exist instead of a fixed framesPerState, which
+  // would animate into the transparent padding of ragged sheets (blank flash).
+  framesByState?: Record<string, number>
   loopMs?: number
   scale?: number
   stateRows?: string[]

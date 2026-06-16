@@ -126,6 +126,55 @@ def _open_sheet(path: Path):
     return img.convert("RGBA")
 
 
+# Max alpha at/below which a frame counts as blank padding.  petdex sheets are
+# left-packed: a state with fewer real frames than ``FRAMES_PER_STATE`` fills
+# the trailing columns with fully transparent cells.  Animating into one flashes
+# the pet blank, so we stop the row at the first such gap.
+_BLANK_ALPHA = 8
+
+
+def _frame_is_blank(frame) -> bool:
+    """True if *frame* has no meaningfully opaque pixel (transparent padding)."""
+    return frame.getchannel("A").getextrema()[1] <= _BLANK_ALPHA
+
+
+@lru_cache(maxsize=16)
+def _raw_frames(
+    sheet_path: str,
+    state_value: str,
+    frame_w: int,
+    frame_h: int,
+    frames_per_state: int,
+) -> tuple:
+    """Cropped, padding-trimmed RGBA frames for one state row (unscaled).
+
+    Steps across the row until the first blank column so pets with ragged
+    per-state frame counts never animate into empty padding.  Cached; returns
+    ``()`` on any decode failure.
+    """
+    try:
+        sheet = _open_sheet(Path(sheet_path))
+        cols = max(1, sheet.width // frame_w)
+        row = state_row_index(state_value)
+        top = row * frame_h
+        # Clamp the row to the sheet (some pets ship fewer rows than the 8 the
+        # taxonomy reserves).
+        if top + frame_h > sheet.height:
+            top = max(0, sheet.height - frame_h)
+
+        frames = []
+        for i in range(min(frames_per_state, cols)):
+            left = i * frame_w
+            frame = sheet.crop((left, top, left + frame_w, top + frame_h))
+            if _frame_is_blank(frame):
+                break  # trailing transparent padding — real frames end here
+            frames.append(frame)
+        return tuple(frames)
+    except Exception as exc:  # noqa: BLE001 - cosmetic feature, never fatal
+        logger.debug("pet frame decode failed (%s, %s): %s", sheet_path, state_value, exc)
+        return ()
+
+
 @lru_cache(maxsize=8)
 def _frames_for(
     sheet_path: str,
@@ -136,36 +185,38 @@ def _frames_for(
     scale_w: int,
     scale_h: int,
 ):
-    """Return a list of RGBA PIL frames for one state row, scaled.
+    """Return padding-trimmed RGBA frames for one state row, scaled.
 
-    Cached by every argument so repeated frame requests during animation are
-    free.  Returns ``[]`` on any decode failure.
+    Thin scaling layer over :func:`_raw_frames`; both are cached so repeated
+    frame requests during animation are free.
     """
-    try:
-        from PIL import Image
+    raw = _raw_frames(sheet_path, state_value, frame_w, frame_h, frames_per_state)
+    if not raw or (scale_w, scale_h) == (frame_w, frame_h):
+        return list(raw)
+    from PIL import Image
 
-        sheet = _open_sheet(Path(sheet_path))
-        cols = max(1, sheet.width // frame_w)
-        n = min(frames_per_state, cols)
-        row = state_row_index(state_value)
-        top = row * frame_h
-        # Clamp the row to the sheet (some pets ship fewer rows than the 8 the
-        # taxonomy reserves).
-        if top + frame_h > sheet.height:
-            top = max(0, sheet.height - frame_h)
+    return [f.resize((scale_w, scale_h), Image.LANCZOS) for f in raw]
 
-        frames = []
-        for i in range(n):
-            left = i * frame_w
-            box = (left, top, left + frame_w, top + frame_h)
-            frame = sheet.crop(box)
-            if (scale_w, scale_h) != (frame_w, frame_h):
-                frame = frame.resize((scale_w, scale_h), Image.LANCZOS)
-            frames.append(frame)
-        return frames
-    except Exception as exc:  # noqa: BLE001 - cosmetic feature, never fatal
-        logger.debug("pet frame decode failed (%s, %s): %s", sheet_path, state_value, exc)
-        return []
+
+def state_frame_counts(
+    sheet_path: str | Path,
+    *,
+    frame_w: int = FRAME_W,
+    frame_h: int = FRAME_H,
+    frames_per_state: int = FRAMES_PER_STATE,
+) -> dict[str, int]:
+    """Map each driven :class:`PetState` → its real (padding-trimmed) frame count.
+
+    The single source of truth for "how many frames does this state actually
+    have?".  The CLI/TUI consume the trimmed frame lists directly; the gateway
+    ships this map to the desktop canvas, which steps its own loop.
+    """
+    return {
+        state.value: len(
+            _raw_frames(str(sheet_path), state.value, frame_w, frame_h, frames_per_state)
+        )
+        for state in PetState
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────
