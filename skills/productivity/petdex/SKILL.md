@@ -46,6 +46,7 @@ Use the `terminal` tool to run `hermes pets <subcommand>`.
 | List installed pets | `hermes pets list --installed` |
 | Install a pet | `hermes pets install <slug>` (add `--select` to make it active) |
 | Set the active pet | `hermes pets select <slug>` (omit slug for a picker) |
+| Resize the pet everywhere | `hermes pets scale <factor>` (e.g. `0.5`, clamped 0.1–3.0) |
 | Preview/animate in terminal | `hermes pets show [slug] [--cycle] [--state run]` |
 | Disable the pet | `hermes pets off` |
 | Remove a pet | `hermes pets remove <slug>` |
@@ -69,7 +70,10 @@ Under `display.pet` in `config.yaml`:
 - `enabled` (bool) — master on/off.
 - `slug` (str) — active pet; empty = first installed.
 - `render_mode` — `auto` (detect) | `kitty` | `iterm` | `sixel` | `unicode` | `off`.
-- `scale` (float) — on-screen scale of the native 192×208 frames (default 0.7).
+- `scale` (float) — on-screen size of the native 192×208 frames (default 0.33,
+  clamped 0.1–3.0). One knob resizes every surface; set it with
+  `hermes pets scale <factor>`, the `/pet scale` slash command, or the desktop
+  Appearance slider.
 - `unicode_cols` (int) — width in columns for the Unicode fallback.
 
 ## Pitfalls
