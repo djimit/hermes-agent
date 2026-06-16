@@ -53,6 +53,7 @@ interface PetCellsResult {
   graphics?: string
   imageId?: number
   placeholder?: string[]
+  scale?: number
   slug?: string
   state?: string
 }
@@ -98,6 +99,7 @@ export function usePet(): PetRender {
 
   const cache = useRef<Map<string, CacheEntry>>(new Map())
   const slugRef = useRef('')
+  const scaleRef = useRef(0)
   const imageIdRef = useRef(0)
   const stateRef = useRef<PetState>('idle')
   const frameRef = useRef(0)
@@ -185,10 +187,15 @@ export function usePet(): PetRender {
         }
 
         const slug = res.slug ?? ''
+        const scale = res.scale ?? 0
 
-        if (slug !== slugRef.current) {
+        // A switch OR a live `/pet scale` change invalidates the cached frames
+        // (they're rendered at the old size), so the steady poll repaints at the
+        // new scale without a restart.
+        if (slug !== slugRef.current || (scale > 0 && scale !== scaleRef.current)) {
           releaseKitty()
           slugRef.current = slug
+          scaleRef.current = scale
           cache.current.clear()
           frameRef.current = 0
         }

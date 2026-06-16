@@ -4993,6 +4993,20 @@ def _(rid, params: dict) -> dict:
     return _ok(rid, usage)
 
 
+def _pet_frame_counts(spritesheet) -> dict:
+    """Real (padding-trimmed) frame count per state, for the desktop canvas.
+
+    Fail-open: a decode hiccup returns ``{}`` and the canvas falls back to its
+    static ``framesPerState`` rather than breaking the (cosmetic) pet.
+    """
+    try:
+        from agent.pet import render
+
+        return render.state_frame_counts(str(spritesheet))
+    except Exception:  # noqa: BLE001 - cosmetic, never break the surface
+        return {}
+
+
 @method("pet.info")
 def _(rid, params: dict) -> dict:
     """Return the active petdex pet for surfaces that render sprites.
@@ -5041,6 +5055,7 @@ def _(rid, params: dict) -> dict:
                 "frameW": constants.FRAME_W,
                 "frameH": constants.FRAME_H,
                 "framesPerState": constants.FRAMES_PER_STATE,
+                "framesByState": _pet_frame_counts(pet.spritesheet),
                 "loopMs": constants.LOOP_MS,
                 "scale": float(pet_cfg.get("scale", constants.DEFAULT_SCALE) or constants.DEFAULT_SCALE),
                 "stateRows": list(constants.STATE_ROWS),
@@ -5119,6 +5134,7 @@ def _(rid, params: dict) -> dict:
                             "placeholder": payload["placeholder"],
                             "frames": payload["frames"],
                             "frameMs": constants.LOOP_MS / max(1, kcount),
+                            "scale": scale,
                         },
                     )
 
@@ -5146,6 +5162,7 @@ def _(rid, params: dict) -> dict:
                 "cols": cols,
                 "frameMs": constants.LOOP_MS / max(1, count),
                 "frames": frames,
+                "scale": scale,
             },
         )
     except Exception as exc:  # noqa: BLE001
@@ -5318,6 +5335,26 @@ def _(rid, params: dict) -> dict:
     except Exception as exc:  # noqa: BLE001
         logger.debug("pet.disable failed: %s", exc)
         return _err(rid, 5031, f"pet.disable failed: {exc}")
+
+
+@method("pet.scale")
+def _(rid, params: dict) -> dict:
+    """Persist ``display.pet.scale`` from the desktop slider. Params: ``scale``.
+
+    Clamped to the engine bounds. The renderer updates its own ``$petInfo`` for
+    instant feedback; this just makes the change durable + visible to the other
+    terminal surfaces on their next read.
+    """
+    try:
+        from hermes_cli.pets import set_pet_scale
+
+        scale, err = set_pet_scale(params.get("scale"))
+        if err:
+            return _err(rid, 4004, err)
+        return _ok(rid, {"ok": True, "scale": scale})
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("pet.scale failed: %s", exc)
+        return _err(rid, 5031, f"pet.scale failed: {exc}")
 
 
 @method("credits.view")
