@@ -2,7 +2,7 @@ import type { MutableRefObject } from 'react'
 import { useCallback, useRef } from 'react'
 import type { NavigateFunction } from 'react-router-dom'
 
-import { deleteSession, getSessionMessages, listAllProfileSessions, setSessionArchived } from '@/hermes'
+import { deleteSession, getSession, getSessionMessages, setSessionArchived } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { type ChatMessage, chatMessageText, preserveLocalAssistantErrors, toChatMessages } from '@/lib/chat-messages'
 import { normalizePersonalityValue } from '@/lib/chat-runtime'
@@ -12,9 +12,13 @@ import { clearQueuedPrompts } from '@/store/composer-queue'
 import { $pinnedSessionIds } from '@/store/layout'
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
-import { $activeGatewayProfile, $newChatProfile, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
+import { $activeGatewayProfile, $newChatProfile, $profiles, ensureGatewayProfile, normalizeProfileKey } from '@/store/profile'
 import {
   $currentCwd,
+  $currentFastMode,
+  $currentModel,
+  $currentProvider,
+  $currentReasoningEffort,
   $messages,
   $sessions,
   $yoloActive,
@@ -42,6 +46,7 @@ import {
   setYoloActive,
   workspaceCwdForNewSession
 } from '@/store/session'
+import { broadcastSessionsChanged } from '@/store/session-sync'
 import { reportBackendContract } from '@/store/updates'
 import { isWatchWindow } from '@/store/windows'
 import type { SessionCreateResponse, SessionInfo, SessionResumeResponse, SessionRuntimeInfo, UsageStats } from '@/types/hermes'
@@ -236,18 +241,42 @@ async function resolveStoredSession(storedSessionId: string): Promise<SessionInf
     return cached
   }
 
+  // Direct by-id on the live backend — one row lookup, no list scan. Covers
+  // single-profile users and any id on the active profile (e.g. an old session
+  // past the sidebar's recent window). 404 just means it's not on this profile.
   try {
-    const result = await listAllProfileSessions(500, 0, 'include', 'recent', 'all')
-    const resolved = result.sessions.find(session => sessionMatchesStoredId(session, storedSessionId))
+    const session = await getSession(storedSessionId)
 
-    if (resolved) {
-      upsertResolvedSession(resolved, storedSessionId)
-    }
+    upsertResolvedSession(session, storedSessionId)
 
-    return resolved
+    return session
   } catch {
-    return undefined
+    // Not on the active profile — fall through to the cross-profile probe.
   }
+
+  // Multi-profile only: probe each other profile by id (still one cheap lookup
+  // each) rather than pulling every profile's recent sessions. The first hit
+  // carries its owning `profile`, which routes the resume to the right backend.
+  const activeKey = normalizeProfileKey($activeGatewayProfile.get())
+
+  const otherProfiles = $profiles
+    .get()
+    .map(profile => normalizeProfileKey(profile.name))
+    .filter(key => key !== activeKey)
+
+  for (const profile of otherProfiles) {
+    try {
+      const session = await getSession(storedSessionId, profile)
+
+      upsertResolvedSession(session, storedSessionId)
+
+      return session
+    } catch {
+      // Not on this profile; try the next.
+    }
+  }
+
+  return undefined
 }
 
 type SessionRuntimeStatePatch = Partial<
@@ -382,13 +411,13 @@ export function useSessionActions({
       })
       setSessionStartedAt(null)
       setTurnStartedAt(null)
-      // New chats start in the configured default project dir when set,
-      // otherwise the sticky last-used workspace (PR #37586).
-      setCurrentModel('')
-      setCurrentProvider('')
-      setCurrentReasoningEffort('')
+      // The composer's model/effort/fast is sticky UI state (persisted in
+      // localStorage) — a new chat FOLLOWS your last pick instead of snapping
+      // back to the profile default, so we deliberately don't reset it here. The
+      // profile default still owns first-run seeding and profile switches (see
+      // refreshCurrentModel). Only $currentServiceTier (a live-session mirror)
+      // is cleared.
       setCurrentServiceTier('')
-      setCurrentFastMode(false)
       setYoloActive(false)
       setCurrentCwd(workspaceCwdForNewSession())
       setCurrentBranch('')
@@ -418,11 +447,23 @@ export function useSessionActions({
         const newChatProfile = $newChatProfile.get() ?? normalizeProfileKey($activeGatewayProfile.get())
         await ensureGatewayProfile(newChatProfile)
         const cwd = $currentCwd.get().trim() || workspaceCwdForNewSession()
+        // The composer's model/effort/fast is sticky UI state ($currentModel,
+        // $currentProvider, $currentReasoningEffort, $currentFastMode). Ship it
+        // with every session.create so the new chat opens on whatever the picker
+        // shows — applied as per-session overrides, never written to the profile
+        // default (that lives in Settings → Model).
+        const uiModel = $currentModel.get().trim()
+        const uiProvider = $currentProvider.get().trim()
+        const uiEffort = $currentReasoningEffort.get().trim()
+        const uiFast = $currentFastMode.get()
 
         const created = await requestGateway<SessionCreateResponse>('session.create', {
           cols: 96,
           ...(cwd && { cwd }),
-          ...(newChatProfile ? { profile: newChatProfile } : {})
+          ...(newChatProfile ? { profile: newChatProfile } : {}),
+          ...(uiModel ? { model: uiModel, ...(uiProvider ? { provider: uiProvider } : {}) } : {}),
+          ...(uiEffort ? { reasoning_effort: uiEffort } : {}),
+          ...(uiFast ? { fast: true } : {})
         })
 
         const stored = created.stored_session_id ?? null
@@ -448,6 +489,9 @@ export function useSessionActions({
           // server later returns its own preview/title and supersedes this.
           upsertOptimisticSession(created, stored, null, preview?.trim() || null)
           navigate(sessionRoute(stored), { replace: true })
+          // Other windows (e.g. the main window when this is the pop-out) can't
+          // see this session until they re-pull the shared list.
+          broadcastSessionsChanged()
         }
 
         setFreshDraftReady(false)
@@ -523,8 +567,31 @@ export function useSessionActions({
       const isCurrentResume = () =>
         resumeRequestRef.current === requestId && selectedStoredSessionIdRef.current === storedSessionId
 
+      // Paint the click before the profile-resolve / gateway-swap awaits below,
+      // so there's zero dead air: highlight the row instantly (the sidebar reads
+      // $selectedStoredSessionId) and, for a cold target, drop the previous
+      // transcript so the thread shows its loader instead of the old session
+      // lingering until resume lands. A warm-cached target keeps its transcript —
+      // the cached fast-path repaints it this same tick. Setting the ref here is
+      // also what use-route-resume's self-heal assumes ("set synchronously at
+      // resume entry").
+      setFreshDraftReady(false)
+      clearNotifications()
+      setSelectedStoredSessionId(storedSessionId)
+      selectedStoredSessionIdRef.current = storedSessionId
+
+      const warmRuntimeId = runtimeIdByStoredSessionIdRef.current.get(storedSessionId)
+
+      if (!warmRuntimeId || !sessionStateByRuntimeIdRef.current.get(warmRuntimeId)) {
+        setActiveSessionId(null)
+        activeSessionIdRef.current = null
+        setMessages([])
+      }
+
       // Swap the single live gateway to this session's profile before any
       // gateway call (no-op when it's already on that profile / single-profile).
+      // resolveStoredSession finds the row by id (cheap), so an uncached pasted
+      // id loads as fast as a sidebar click instead of hanging on a list scan.
       const storedForProfile = await resolveStoredSession(storedSessionId)
       const sessionProfile = storedForProfile?.profile
 

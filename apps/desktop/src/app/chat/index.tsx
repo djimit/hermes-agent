@@ -42,6 +42,7 @@ import {
   $sessions,
   sessionPinId
 } from '@/store/session'
+import { isSecondaryWindow } from '@/store/windows'
 import type { ModelOptionsResponse } from '@/types/hermes'
 
 import { routeSessionId } from '../routes'
@@ -61,6 +62,7 @@ import { threadLoadingState } from './thread-loading'
 
 interface ChatViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
   gateway: HermesGateway | null
+  modelMenuContent?: React.ReactNode
   onToggleSelectedPin: () => void
   onDeleteSelectedSession: () => void
   onCancel: () => Promise<void> | void
@@ -119,10 +121,10 @@ function ChatHeader({
       ? pinnedSessionIds.includes(selectedSessionId)
       : false
 
-  // A brand-new session has no session to pin/delete/rename, so the header is
-  // just a dead "New session" label + chevron. Drop it (and its border)
-  // entirely until there's a real session to act on.
-  if (!selectedSessionId && !activeSessionId && !isRoutedSessionView) {
+  // Secondary windows (new-session scratch, subagent watch, cmd-click pop-out)
+  // are compact side panels — they drop the session-actions header + border
+  // entirely. A brand-new draft has nothing to pin/delete/rename either.
+  if (isSecondaryWindow() || (!selectedSessionId && !activeSessionId && !isRoutedSessionView)) {
     return null
   }
 
@@ -165,7 +167,12 @@ interface ChatRuntimeBoundaryProps {
   onEdit: (message: AppendMessage) => Promise<void>
   onReload: (parentId: string | null) => Promise<void>
   onThreadMessagesChange: (messages: readonly ThreadMessage[]) => void
+  /** Route points at an unloaded session — render empty until resume swaps in
+   *  the new transcript, so the previous session's messages don't linger. */
+  suppressMessages: boolean
 }
+
+const NO_MESSAGES: ChatMessage[] = []
 
 /**
  * Owns the $messages subscription and the assistant-ui external-store runtime.
@@ -183,9 +190,11 @@ function ChatRuntimeBoundary({
   onCancel,
   onEdit,
   onReload,
-  onThreadMessagesChange
+  onThreadMessagesChange,
+  suppressMessages
 }: ChatRuntimeBoundaryProps) {
-  const messages = useStore($messages)
+  const storeMessages = useStore($messages)
+  const messages = suppressMessages ? NO_MESSAGES : storeMessages
   const runtimeMessageCacheRef = useRef(new WeakMap<ChatMessage, ThreadMessage>())
 
   const runtimeMessageRepository = useMemo(() => {
@@ -242,6 +251,7 @@ function ChatRuntimeBoundary({
 export function ChatView({
   className,
   gateway,
+  modelMenuContent,
   onToggleSelectedPin,
   onDeleteSelectedSession,
   onCancel,
@@ -286,16 +296,26 @@ export function ChatView({
   const messagesEmpty = useStore($messagesEmpty)
   const lastVisibleIsUser = useStore($lastVisibleMessageIsUser)
   const selectedSessionId = useStore($selectedStoredSessionId)
-  const isRoutedSessionView = Boolean(routeSessionId(location.pathname))
+  const routedSessionId = routeSessionId(location.pathname)
+  const isRoutedSessionView = Boolean(routedSessionId)
 
-  const showIntro = freshDraftReady && !isRoutedSessionView && !selectedSessionId && !activeSessionId && messagesEmpty
+  // The URL points at a session the store hasn't loaded yet (sidebar / cmd-K /
+  // direct nav). Derived in render so the swap reads instantly: the same frame
+  // the id changes we drop the old transcript and show the loader, instead of
+  // waiting for the resume effect (which paints a frame later) to clear them.
+  const routeSessionMismatch = isRoutedSessionView && routedSessionId !== selectedSessionId
+
+  // The compact new-session pop-out skips the wordmark/tagline intro — it's a
+  // scratch window, not the full-height empty state.
+  const showIntro =
+    !isSecondaryWindow() && freshDraftReady && !isRoutedSessionView && !selectedSessionId && !activeSessionId && messagesEmpty
 
   // Session is still loading if the route references a session we haven't
   // resumed yet. Once `activeSessionId` is set (runtime has resumed), the
   // session exists — even if it has zero messages (a brand-new routed
   // session). The flicker where `busy` flips true briefly during hydrate
   // is handled by `threadLoadingState`'s last-visible-user gate.
-  const loadingSession = isRoutedSessionView && messagesEmpty && !activeSessionId
+  const loadingSession = isRoutedSessionView && (routeSessionMismatch || (messagesEmpty && !activeSessionId))
   const threadLoading = threadLoadingState(loadingSession, busy, awaitingResponse, lastVisibleIsUser)
   const showChatBar = !loadingSession
   const threadKey = selectedSessionId || activeSessionId || (isRoutedSessionView ? location.pathname : 'new')
@@ -328,6 +348,7 @@ export function ChatView({
         provider: currentProvider,
         canSwitch: gatewayOpen,
         loading: !gatewayOpen || (!currentModel && !currentProvider),
+        modelMenuContent,
         quickModels
       },
       tools: {
@@ -340,7 +361,7 @@ export function ChatView({
         active: false
       }
     }),
-    [contextSuggestions, currentModel, currentProvider, gatewayOpen, quickModels]
+    [contextSuggestions, currentModel, currentProvider, gatewayOpen, modelMenuContent, quickModels]
   )
 
   // Drop files anywhere in the conversation area, not just on the composer
@@ -401,6 +422,7 @@ export function ChatView({
           onEdit={onEdit}
           onReload={onReload}
           onThreadMessagesChange={onThreadMessagesChange}
+          suppressMessages={routeSessionMismatch}
         >
           <Thread
             clampToComposer={showChatBar}
