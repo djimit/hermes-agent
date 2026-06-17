@@ -923,10 +923,10 @@ export const zh: Translations = {
     commandCenter: '命令中心',
     appearance: '外观',
     settings: '设置',
-    changeTheme: '更改主题...',
+    changeTheme: '更改主题',
     changeColorMode: '更改颜色模式...',
     pets: {
-      title: '宠物...',
+      title: '宠物',
       placeholder: '搜索宠物…',
       loading: '正在加载 petdex 画廊…',
       error: '无法连接到 petdex 画廊。',
@@ -934,9 +934,7 @@ export const zh: Translations = {
       empty: '没有匹配的宠物。',
       turnOff: '关闭',
       turnOn: '开启',
-      active: '当前',
       installed: '已安装',
-      adopting: '正在领养…',
       adoptFailed: '无法领养该宠物。',
       toggleFailed: '无法切换宠物显示。',
       noneAvailable: '暂无可用宠物——请在下方选择一个安装。'

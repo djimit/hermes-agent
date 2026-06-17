@@ -5,6 +5,7 @@ import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { persistString, storedString } from '@/lib/storage'
 import { $petInfo, type PetInfo, setPetInfo } from '@/store/pet'
 import { $gatewayState } from '@/store/session'
+import { useTheme } from '@/themes/context'
 
 import { PetSprite } from './pet-sprite'
 
@@ -22,6 +23,12 @@ function clampToViewport({ x, y }: Point): Point {
   const maxY = Math.max(0, (window.innerHeight || 600) - 80)
 
   return { x: Math.min(Math.max(0, x), maxX), y: Math.min(Math.max(0, y), maxY) }
+}
+
+// The sprite art faces left by default, so mirror it when the pet's center sits
+// on the left half of the window — it always faces inward, toward the content.
+function facing(leftX: number, petW: number): string {
+  return leftX + petW / 2 < (window.innerWidth || 800) / 2 ? 'scaleX(-1)' : 'none'
 }
 
 function loadPosition(): Point {
@@ -61,11 +68,18 @@ const PET_POLL_MS = 3000
 
 export function FloatingPet() {
   const { requestGateway } = useGatewayRequest()
+  const { resolvedMode } = useTheme()
   const gatewayState = useStore($gatewayState)
   const info = useStore($petInfo)
 
   const [position, setPosition] = useState<Point>(loadPosition)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const petW = (info.frameW ?? 192) * (info.scale ?? 0.33)
+  // Soft contact shadow, sized off the pet so every scale/species grounds the
+  // same way (cf. lairp's per-actor feet ellipse). Lighter on light backgrounds.
+  const shadowW = Math.round(petW * 0.55)
+  const shadowH = Math.max(3, Math.round(shadowW * 0.28))
+  const shadowAlpha = resolvedMode === 'light' ? 0.2 : 0.55
   // Live drag offset (pointer → element top-left). Drag updates the DOM
   // directly to avoid a React re-render (and canvas reflow) per pointermove —
   // state is only committed on release.
@@ -102,6 +116,27 @@ export function FloatingPet() {
     }
   }, [gatewayState, active, requestGateway])
 
+  // A window resize must never strand the pet off-screen — re-clamp the
+  // committed position (and persist it) whenever the viewport shrinks.
+  useEffect(() => {
+    const onResize = () =>
+      setPosition(prev => {
+        const next = clampToViewport(prev)
+
+        if (next.x === prev.x && next.y === prev.y) {
+          return prev
+        }
+
+        persistString(POSITION_KEY, JSON.stringify(next))
+
+        return next
+      })
+
+    window.addEventListener('resize', onResize)
+
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     const el = containerRef.current
 
@@ -115,21 +150,26 @@ export function FloatingPet() {
     el.style.cursor = 'grabbing'
   }, [])
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const drag = dragRef.current
-    const el = containerRef.current
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const drag = dragRef.current
+      const el = containerRef.current
 
-    if (!drag || !el) {
-      return
-    }
+      if (!drag || !el) {
+        return
+      }
 
-    const next = clampToViewport({ x: e.clientX - drag.dx, y: e.clientY - drag.dy })
-    drag.x = next.x
-    drag.y = next.y
-    // Mutate the DOM directly — no setState, so no re-render while dragging.
-    el.style.left = `${next.x}px`
-    el.style.top = `${next.y}px`
-  }, [])
+      const next = clampToViewport({ x: e.clientX - drag.dx, y: e.clientY - drag.dy })
+      drag.x = next.x
+      drag.y = next.y
+      // Mutate the DOM directly — no setState, so no re-render while dragging. The
+      // mirror follows the pointer across the midline for the same reason.
+      el.style.left = `${next.x}px`
+      el.style.top = `${next.y}px`
+      el.style.transform = facing(next.x, petW)
+    },
+    [petW]
+  )
 
   const onPointerUp = useCallback((e: React.PointerEvent) => {
     const drag = dragRef.current
@@ -166,12 +206,29 @@ export function FloatingPet() {
         position: 'fixed',
         top: position.y,
         touchAction: 'none',
+        transform: facing(position.x, petW),
         userSelect: 'none',
         zIndex: 60
       }}
       title={info.displayName || 'pet'}
     >
-      <PetSprite info={info} />
+      <div
+        aria-hidden
+        style={{
+          background: `radial-gradient(ellipse at center, rgba(0,0,0,${shadowAlpha}) 0%, rgba(0,0,0,0) 70%)`,
+          bottom: -shadowH * 0.4,
+          height: shadowH,
+          left: '50%',
+          pointerEvents: 'none',
+          position: 'absolute',
+          transform: 'translateX(-50%)',
+          width: shadowW,
+          zIndex: 0
+        }}
+      />
+      <div style={{ lineHeight: 0, position: 'relative', zIndex: 1 }}>
+        <PetSprite info={info} />
+      </div>
     </div>
   )
 }

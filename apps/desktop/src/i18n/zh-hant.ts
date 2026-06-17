@@ -830,10 +830,10 @@ export const zhHant = defineLocale({
     commandCenter: '命令中心',
     appearance: '外觀',
     settings: '設定',
-    changeTheme: '變更主題...',
+    changeTheme: '變更主題',
     changeColorMode: '變更色彩模式...',
     pets: {
-      title: '寵物...',
+      title: '寵物',
       placeholder: '搜尋寵物…',
       loading: '正在載入 petdex 畫廊…',
       error: '無法連線至 petdex 畫廊。',
@@ -841,9 +841,7 @@ export const zhHant = defineLocale({
       empty: '沒有符合的寵物。',
       turnOff: '關閉',
       turnOn: '開啟',
-      active: '使用中',
       installed: '已安裝',
-      adopting: '正在領養…',
       adoptFailed: '無法領養該寵物。',
       toggleFailed: '無法切換寵物顯示。',
       noneAvailable: '尚無可用寵物——請在下方選擇一個安裝。'

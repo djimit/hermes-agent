@@ -735,10 +735,10 @@ export const en: Translations = {
     commandCenter: 'Command Center',
     appearance: 'Appearance',
     settings: 'Settings',
-    changeTheme: 'Change theme...',
+    changeTheme: 'Change theme',
     changeColorMode: 'Change color mode...',
     pets: {
-      title: 'Pets...',
+      title: 'Pets',
       placeholder: 'Search pets…',
       loading: 'Loading petdex gallery…',
       error: 'Could not reach the petdex gallery.',
@@ -746,9 +746,7 @@ export const en: Translations = {
       empty: 'No matching pets.',
       turnOff: 'Turn off',
       turnOn: 'Turn on',
-      active: 'Active',
       installed: 'Installed',
-      adopting: 'Adopting…',
       adoptFailed: 'Could not adopt that pet.',
       toggleFailed: 'Could not toggle the pet.',
       noneAvailable: 'No pets available — pick one below to install.'

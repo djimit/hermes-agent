@@ -622,9 +622,7 @@ export interface Translations {
       empty: string
       turnOff: string
       turnOn: string
-      active: string
       installed: string
-      adopting: string
       adoptFailed: string
       toggleFailed: string
       noneAvailable: string

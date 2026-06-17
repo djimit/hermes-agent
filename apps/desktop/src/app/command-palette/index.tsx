@@ -63,7 +63,7 @@ import { fieldCopyForSchemaKey } from '../settings/field-copy'
 import { prettyName } from '../settings/helpers'
 
 import { MarketplaceThemePage } from './marketplace-theme-page'
-import { PetPalettePage } from './pet-palette-page'
+import { PetInlineToggle, PetPalettePage } from './pet-palette-page'
 
 interface PaletteItem {
   /** Keybind action id — its live combo renders as a hotkey hint. */
@@ -648,6 +648,7 @@ export function CommandPalette() {
               }}
               onValueChange={setSearch}
               placeholder={placeholder}
+              right={page === 'pets' ? <PetInlineToggle /> : undefined}
               value={search}
             />
             <CommandList className="dt-portal-scrollbar max-h-[min(20rem,56vh)]">

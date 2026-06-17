@@ -859,10 +859,10 @@ export const ja = defineLocale({
     commandCenter: 'コマンドセンター',
     appearance: '外観',
     settings: '設定',
-    changeTheme: 'テーマを変更...',
+    changeTheme: 'テーマを変更',
     changeColorMode: 'カラーモードを変更...',
     pets: {
-      title: 'ペット...',
+      title: 'ペット',
       placeholder: 'ペットを検索…',
       loading: 'petdex ギャラリーを読み込み中…',
       error: 'petdex ギャラリーに接続できません。',
@@ -870,9 +870,7 @@ export const ja = defineLocale({
       empty: '一致するペットがありません。',
       turnOff: 'オフ',
       turnOn: 'オン',
-      active: '使用中',
       installed: 'インストール済み',
-      adopting: '採用中…',
       adoptFailed: 'ペットを採用できませんでした。',
       toggleFailed: 'ペットを切り替えできませんでした。',
       noneAvailable: '利用可能なペットがありません。'
