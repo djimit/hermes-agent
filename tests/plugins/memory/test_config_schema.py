@@ -1,11 +1,19 @@
 """Tests for config-schema loading from memory provider plugin dirs."""
 
+import pytest
+
 import plugins.memory.config_schema as config_schema
+from plugins.memory import find_provider_dir
 from plugins.memory.config_schema import get_provider_config_schema
 
 
 def test_unknown_provider_is_none():
     assert get_provider_config_schema("builtin") is None
+
+
+@pytest.mark.parametrize("name", ["../hindsight", "nested/provider", r"nested\\provider", ".", "..", ""])
+def test_provider_lookup_rejects_path_like_names(name):
+    assert find_provider_dir(name) is None
 
 
 def test_plugin_without_schema_is_none():

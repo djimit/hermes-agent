@@ -126,6 +126,9 @@ def find_provider_dir(name: str) -> Optional[Path]:
 
     Checks bundled first, then user-installed.
     """
+    if not isinstance(name, str) or name in {"", ".", ".."} or Path(name).name != name or "\\" in name:
+        return None
+
     # Bundled
     bundled = _MEMORY_PLUGINS_DIR / name
     if bundled.is_dir() and (bundled / "__init__.py").exists():
