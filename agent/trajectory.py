@@ -10,6 +10,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
+from agent.redact import redact_sensitive_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,7 +52,8 @@ def save_trajectory(trajectory: List[Dict[str, Any]], model: str,
 
     try:
         with open(filename, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            serialized = json.dumps(entry, ensure_ascii=False)
+            f.write(redact_sensitive_text(serialized, force=True) + "\n")
         logger.info("Trajectory saved to %s", filename)
     except Exception as e:
         logger.warning("Failed to save trajectory: %s", e)
