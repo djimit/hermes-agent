@@ -617,7 +617,10 @@ def attachments_root(board: Optional[str] = None) -> Path:
 
 def task_attachments_dir(task_id: str, board: Optional[str] = None) -> Path:
     """Return the per-task attachment directory ``<root>/<task_id>/``."""
-    return attachments_root(board=board) / task_id
+    safe_id = Path(task_id).name
+    if safe_id != task_id or safe_id in {"", ".", ".."} or "\\" in safe_id:
+        raise ValueError(f"invalid task id: {task_id!r}")
+    return attachments_root(board=board) / safe_id
 
 
 def worker_logs_dir(board: Optional[str] = None) -> Path:
@@ -9788,7 +9791,10 @@ def worker_log_path(task_id: str, *, board: Optional[str] = None) -> Path:
     current-board file → default). The dispatcher always passes the
     board explicitly to avoid any resolution ambiguity when multiple
     boards exist."""
-    return worker_logs_dir(board=board) / f"{task_id}.log"
+    safe_id = Path(task_id).name
+    if safe_id != task_id or safe_id in {"", ".", ".."} or "\\" in safe_id:
+        raise ValueError(f"invalid task id: {task_id!r}")
+    return worker_logs_dir(board=board) / f"{safe_id}.log"
 
 
 def read_worker_log(

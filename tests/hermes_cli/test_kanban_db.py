@@ -18,6 +18,23 @@ import hermes_state
 from hermes_cli import kanban_db as kb
 
 
+@pytest.mark.parametrize("task_id", ["../escape", "sub/task", r"sub\\task", ".", "..", ""])
+def test_task_files_reject_path_like_ids(task_id, tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path))
+
+    with pytest.raises(ValueError, match="invalid task id"):
+        kb.task_attachments_dir(task_id)
+    with pytest.raises(ValueError, match="invalid task id"):
+        kb.worker_log_path(task_id)
+
+
+def test_task_files_preserve_normal_ids(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_KANBAN_HOME", str(tmp_path))
+
+    assert kb.task_attachments_dir("t_deadbeef") == tmp_path / "kanban/attachments/t_deadbeef"
+    assert kb.worker_log_path("t_deadbeef") == tmp_path / "kanban/logs/t_deadbeef.log"
+
+
 @pytest.fixture
 def kanban_home(tmp_path, monkeypatch):
     """Isolated HERMES_HOME with an empty kanban DB."""
