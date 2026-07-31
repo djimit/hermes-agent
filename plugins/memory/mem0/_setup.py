@@ -216,6 +216,10 @@ def _write_env(env_path: Path, env_writes: dict[str, str]) -> None:
             new_lines.append(f"{k}={v}")
 
     env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    try:
+        env_path.chmod(0o600)
+    except OSError:
+        pass
 
 
 def _save_mem0_json(hermes_home: str, data: dict) -> None:

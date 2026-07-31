@@ -1107,6 +1107,7 @@ class TestPostSetupEnvEncoding:
         assert "HINDSIGHT_API_KEY=sk-new" in content
         assert "old" not in content
         assert "﻿" not in content
+        assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
 
 
 class TestClientAutoUpgradeRoutesThroughLazyDeps:
