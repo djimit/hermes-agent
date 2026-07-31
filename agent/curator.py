@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set
 
 from hermes_constants import get_hermes_home
+from agent.redact import redact_sensitive_text
 from tools import skill_usage
 from utils import atomic_json_write
 
@@ -1252,11 +1253,16 @@ def _write_run_report(
         "llm_error": llm_meta.get("error"),
         "tool_calls": llm_meta.get("tool_calls", []),
     }
+    persisted_payload = json.loads(redact_sensitive_text(
+        json.dumps(payload, ensure_ascii=False),
+        force=True,
+        redact_url_credentials=True,
+    ))
 
     # run.json — machine-readable, full fidelity
     try:
         (run_dir / "run.json").write_text(
-            json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+            json.dumps(persisted_payload, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
     except Exception as e:
@@ -1264,7 +1270,7 @@ def _write_run_report(
 
     # REPORT.md — human-readable
     try:
-        md = _render_report_markdown(payload)
+        md = _render_report_markdown(persisted_payload)
         (run_dir / "REPORT.md").write_text(md, encoding="utf-8")
     except Exception as e:
         logger.debug("Curator REPORT.md write failed: %s", e)
@@ -1274,7 +1280,7 @@ def _write_run_report(
     try:
         if int(cron_rewrites.get("jobs_updated", 0)) > 0:
             (run_dir / "cron_rewrites.json").write_text(
-                json.dumps(cron_rewrites, indent=2, ensure_ascii=False) + "\n",
+                json.dumps(persisted_payload["cron_rewrites"], indent=2, ensure_ascii=False) + "\n",
                 encoding="utf-8",
             )
     except Exception as e:
