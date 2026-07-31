@@ -1,3 +1,5 @@
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
   const parts = path.split(".");
   let cur: unknown = obj;
@@ -11,6 +13,9 @@ export function getNestedValue(obj: Record<string, unknown>, path: string): unkn
 export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): Record<string, unknown> {
   const clone = structuredClone(obj);
   const parts = path.split(".");
+  if (parts.some((part) => UNSAFE_KEYS.has(part))) {
+    throw new Error("Unsafe config path");
+  }
   let cur: Record<string, unknown> = clone;
   for (let i = 0; i < parts.length - 1; i++) {
     if (cur[parts[i]] == null || typeof cur[parts[i]] !== "object") {
