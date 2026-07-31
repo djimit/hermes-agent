@@ -7397,7 +7397,7 @@ def main(
         try:
             with open(sample_filename, "w", encoding="utf-8") as f:
                 # Pretty-print JSON with indent for readability
-                f.write(json.dumps(entry, ensure_ascii=False, indent=2))
+                f.write(redact_sensitive_text(json.dumps(entry, ensure_ascii=False, indent=2), force=True))
             print(f"\n💾 Sample trajectory saved to: {sample_filename}")
         except Exception as e:
             print(f"\n⚠️ Failed to save sample: {e}")
