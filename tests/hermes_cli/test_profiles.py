@@ -106,6 +106,10 @@ class TestGetProfileDir:
         result = get_profile_dir("default")
         assert result == tmp_path / ".hermes"
 
+    def test_rejects_path_traversal(self, profile_env):
+        with pytest.raises(ValueError):
+            get_profile_dir("../../escape")
+
 
 # ===================================================================
 # TestCreateProfile
@@ -814,6 +818,5 @@ class TestProfilesToServe:
         assert set(serve) == {"default", "coder", "writer"}
         assert serve["default"] == _get_default_hermes_home()
         assert serve["coder"] == get_profile_dir("coder")
-
 
 
