@@ -87,6 +87,7 @@ from plugins.memory.config_schema import (
     STORAGE_HONCHO_HOST_BLOCK,
     get_provider_config_schema,
 )
+from tools.url_safety import create_ssrf_safe_client
 from gateway.status import (
     derive_gateway_busy,
     derive_gateway_drainable,
@@ -7323,7 +7324,7 @@ async def validate_custom_endpoint(body: CustomEndpointUpdate):
         headers["Authorization"] = f"Bearer {body.api_key.strip()}"
 
     try:
-        with httpx.Client(timeout=httpx.Timeout(8.0)) as client:
+        with create_ssrf_safe_client(timeout=httpx.Timeout(8.0)) as client:
             resp = client.get(url, headers=headers)
     except Exception:
         return {"ok": False, "reachable": False, "message": f"Could not reach {url}.", "models": []}
@@ -7365,7 +7366,7 @@ async def validate_provider_credential(body: EnvVarUpdate, request: Request):
         api_key = (body.api_key or "").strip()
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else None
         try:
-            with httpx.Client(timeout=httpx.Timeout(8.0)) as client:
+            with create_ssrf_safe_client(timeout=httpx.Timeout(8.0)) as client:
                 resp = client.get(url, headers=headers)
             return {"ok": True, "reachable": True, "message": "", "models": _parse_model_ids(resp)}
         except Exception:
