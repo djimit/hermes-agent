@@ -442,7 +442,7 @@ def _is_third_party_anthropic_endpoint(base_url: str | None) -> bool:
     if not normalized:
         return False  # No base_url = direct Anthropic API
     normalized = normalized.rstrip("/").lower()
-    if "anthropic.com" in normalized:
+    if base_url_host_matches(normalized, "anthropic.com"):
         return False  # Direct Anthropic API — OAuth applies
     return True  # Any other endpoint is a third-party proxy
 
