@@ -11,6 +11,16 @@ from gateway.relay.descriptor import CONTRACT_VERSION, CapabilityDescriptor
 from gateway.session import SessionSource
 
 
+def test_saved_cron_output_redacts_credentials(tmp_path, monkeypatch):
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    router = DeliveryRouter(GatewayConfig())
+    secret = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+
+    path = router._save_full_output(f"token={secret}", "job-1")
+
+    assert secret not in path.read_text()
+
+
 class TestParseTargetPlatformChat:
     def test_explicit_telegram_chat(self):
         target = DeliveryTarget.parse("telegram:12345")
@@ -327,5 +337,4 @@ async def test_long_output_truncated_for_non_chunking_adapter(tmp_path, monkeypa
     saved_files = list(tmp_path.glob("cron/output/job1_*.txt"))
     assert len(saved_files) == 1
     assert saved_files[0].read_text() == long_content
-
 

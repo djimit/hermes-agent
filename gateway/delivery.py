@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 
 from hermes_cli.config import get_hermes_home
+from agent.redact import redact_sensitive_text
 
 logger = logging.getLogger(__name__)
 
@@ -442,7 +443,10 @@ class DeliveryRouter:
         out_dir = get_hermes_home() / "cron" / "output"
         out_dir.mkdir(parents=True, exist_ok=True)
         path = out_dir / f"{job_id}_{timestamp}.txt"
-        path.write_text(content, encoding="utf-8")
+        path.write_text(
+            redact_sensitive_text(content, force=True, redact_url_credentials=True),
+            encoding="utf-8",
+        )
         return path
 
     def _filter_silence_narration_enabled(self) -> bool:
@@ -640,7 +644,6 @@ class DeliveryRouter:
             if _send_result_failed(result):
                 raise RuntimeError(_send_result_error(result) or f"{target.platform.value} delivery failed")
         return result
-
 
 
 

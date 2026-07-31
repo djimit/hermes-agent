@@ -85,6 +85,22 @@ class _StubChild:
 
 class TestDumpSubagentTimeoutDiagnostic:
 
+    def test_redacts_credentials_from_goal(self, hermes_home):
+        from tools.delegate_tool import _dump_subagent_timeout_diagnostic
+        secret = "ghp_abcdefghijklmnopqrstuvwxyz1234567890"
+
+        path = _dump_subagent_timeout_diagnostic(
+            child=_StubChild(),
+            task_index=1,
+            timeout_seconds=1.0,
+            duration_seconds=1.0,
+            worker_thread=None,
+            goal=f"debug token={secret}",
+        )
+
+        assert path is not None
+        assert secret not in Path(path).read_text()
+
     def test_writes_log_with_expected_sections(self, hermes_home):
         from tools.delegate_tool import _dump_subagent_timeout_diagnostic
         child = _StubChild(subagent_id="sa-7-abc123")

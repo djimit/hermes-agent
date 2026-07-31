@@ -1778,7 +1778,14 @@ def _dump_subagent_timeout_diagnostic(
         _w("  Common causes: oversized prompt rejected by provider, transport hang,")
         _w("  credential resolution stuck. See issue #14726 for context.")
 
-        dump_path.write_text("\n".join(lines), encoding="utf-8")
+        from agent.redact import redact_sensitive_text
+
+        dump_path.write_text(
+            redact_sensitive_text(
+                "\n".join(lines), force=True, redact_url_credentials=True
+            ),
+            encoding="utf-8",
+        )
         return str(dump_path)
     except Exception as exc:
         logger.warning("Subagent timeout diagnostic dump failed: %s", exc)
@@ -1803,7 +1810,12 @@ def _spill_summary_to_file(task_index: int, summary: str) -> Optional[str]:
         cache_dir.mkdir(parents=True, exist_ok=True)
         ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         path = cache_dir / f"subagent-summary-{task_index}-{ts}.txt"
-        path.write_text(summary, encoding="utf-8")
+        from agent.redact import redact_sensitive_text
+
+        path.write_text(
+            redact_sensitive_text(summary, force=True, redact_url_credentials=True),
+            encoding="utf-8",
+        )
         return str(path)
     except Exception as exc:
         logger.debug("Failed to spill subagent summary to file: %s", exc)
