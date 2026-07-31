@@ -39,6 +39,7 @@ from tools.skills_guard import (
 )
 from tools.url_safety import is_safe_url
 from tools.website_policy import check_website_access
+from utils import base_url_host_matches
 
 logger = logging.getLogger(__name__)
 
@@ -3047,7 +3048,7 @@ class BrowseShSource(SkillSource):
             pass
 
         source_url = item.get("sourceUrl", "") if isinstance(item, dict) else ""
-        if source_url and "raw.githubusercontent.com" in source_url:
+        if source_url and base_url_host_matches(source_url, "raw.githubusercontent.com"):
             return source_url
         return None
 

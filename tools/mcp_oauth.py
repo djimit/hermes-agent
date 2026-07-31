@@ -53,6 +53,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 from hermes_constants import secure_parent_dir
+from utils import base_url_host_matches
 
 logger = logging.getLogger(__name__)
 
@@ -1143,7 +1144,7 @@ def _is_figma_remote_mcp(
     """True when this MCP server is Figma's hosted remote endpoint."""
     url = (server_url or "").lower()
     name = (server_name or "").lower()
-    if "mcp.figma.com" in url or "figma.com/mcp" in url:
+    if base_url_host_matches(url, "mcp.figma.com"):
         return True
     # Name-only match only when the URL isn't some other host called figma-*.
     if "figma" in name and (not url or "figma" in url):
