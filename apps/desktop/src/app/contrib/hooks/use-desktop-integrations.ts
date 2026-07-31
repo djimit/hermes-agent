@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 
 import { closeActiveTab } from '@/app/chat/close-tab'
 import { openSession } from '@/app/open-session'
+import { blueprintCommand } from '@/lib/blueprint-deep-link'
 import { storedSessionIdForNotification } from '@/lib/session-ids'
 import { respondToApprovalAction } from '@/store/native-notifications'
 import { $activeGatewayProfile } from '@/store/profile'
@@ -158,15 +159,10 @@ export function useDesktopIntegrations({
         return
       }
 
-      const slots = Object.entries(payload.params || {})
-        .map(([k, v]) => {
-          const sval = /\s/.test(v) ? `"${v.replace(/"/g, '\\"')}"` : v
-
-          return `${k}=${sval}`
-        })
-        .join(' ')
-
-      const command = `/blueprint ${payload.name}${slots ? ' ' + slots : ''}`
+      const command = blueprintCommand(payload.name, payload.params || {})
+      if (!command) {
+        return
+      }
       requestComposerInsert(command, { mode: 'block', target: 'main' })
       requestComposerFocus('main')
     })
