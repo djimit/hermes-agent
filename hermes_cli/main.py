@@ -72,6 +72,7 @@ suppress_platform_ver_console()
 
 import os
 import sys
+from utils import base_url_host_matches
 
 # Early venv self-heal — MUST run before any third-party import below.  When
 # a prior ``hermes update`` left a recovery marker and a core package's import
@@ -4384,7 +4385,7 @@ def _prompt_api_key(
 def _infer_stepfun_region(base_url: str) -> str:
     """Infer the current StepFun region from the configured endpoint."""
     normalized = (base_url or "").strip().lower()
-    if "api.stepfun.com" in normalized:
+    if base_url_host_matches(normalized, "api.stepfun.com"):
         return "china"
     return "international"
 
