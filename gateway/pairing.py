@@ -22,6 +22,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import tempfile
 import threading
@@ -293,11 +294,16 @@ class PairingStore:
         """Profile name this store is scoped to, or None for the global store."""
         return self._profile
 
+    def _platform_path(self, platform: str, suffix: str) -> Path:
+        if not re.fullmatch(r"[a-z0-9_-]+", platform):
+            raise ValueError("invalid platform name")
+        return self._dir / f"{platform}-{suffix}.json"
+
     def _pending_path(self, platform: str) -> Path:
-        return self._dir / f"{platform}-pending.json"
+        return self._platform_path(platform, "pending")
 
     def _approved_path(self, platform: str) -> Path:
-        return self._dir / f"{platform}-approved.json"
+        return self._platform_path(platform, "approved")
 
     def _rate_limit_path(self) -> Path:
         return self._dir / "_rate_limits.json"
