@@ -1,6 +1,7 @@
 """Tests for Mem0 setup wizard — flag parsing, config building, validation."""
 
 import json
+import stat
 import sys
 import types
 import pytest
@@ -131,6 +132,7 @@ class TestWriteEnv:
         _write_env(env_path, {"OPENAI_API_KEY": "sk-test"})
         content = env_path.read_text()
         assert "OPENAI_API_KEY=sk-test" in content
+        assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
 
     def test_update_existing_var(self, tmp_path):
         env_path = tmp_path / ".env"
@@ -229,5 +231,4 @@ class TestConnectivityChecks:
     def test_qdrant_path_writable(self, tmp_path):
         ok, msg = _check_qdrant_path(str(tmp_path / "qdrant"))
         assert ok is True
-
 

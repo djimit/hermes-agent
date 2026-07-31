@@ -951,6 +951,10 @@ class HindsightMemoryProvider(MemoryProvider):
                 if k not in updated_keys:
                     new_lines.append(f"{k}={v}")
             env_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+            try:
+                env_path.chmod(0o600)
+            except OSError:
+                pass
 
         if mode == "local_embedded":
             materialized_config = dict(provider_config)
