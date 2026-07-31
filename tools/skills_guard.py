@@ -659,6 +659,7 @@ def scan_skill(skill_path: Path, source: str = "community") -> ScanResult:
     all_findings: List[Finding] = []
 
     if skill_path.is_dir():
+        skill_root = skill_path.resolve()
         ignore = _load_skill_ignore(skill_path)
 
         # Structural checks first (honoring the ignore list)
@@ -666,11 +667,20 @@ def scan_skill(skill_path: Path, source: str = "community") -> ScanResult:
 
         # Pattern scanning on each file
         for f in skill_path.rglob("*"):
-            if f.is_file():
-                rel = str(f.relative_to(skill_path))
-                if ignore(rel):
+            if not f.is_file():
+                continue
+            rel = str(f.relative_to(skill_path))
+            if ignore(rel):
+                continue
+            scan_target = f
+            if f.is_symlink():
+                try:
+                    scan_target = f.resolve()
+                except OSError:
                     continue
-                all_findings.extend(scan_file(f, rel))
+                if not scan_target.is_relative_to(skill_root):
+                    continue
+            all_findings.extend(scan_file(scan_target, rel))
     elif skill_path.is_file():
         all_findings.extend(scan_file(skill_path, skill_path.name))
 
@@ -692,11 +702,20 @@ def _content_digest(skill_path: Path) -> str:
     """Canonical SHA-256 over relative paths and exact file bytes."""
     h = hashlib.sha256()
     if skill_path.is_dir():
+        skill_root = skill_path.resolve()
         for file_path in sorted(skill_path.rglob("*")):
             if file_path.is_file():
                 rel = file_path.relative_to(skill_path).as_posix()
+                digest_target = file_path
+                if file_path.is_symlink():
+                    try:
+                        digest_target = file_path.resolve()
+                    except OSError:
+                        continue
+                    if not digest_target.is_relative_to(skill_root):
+                        continue
                 h.update(rel.encode("utf-8") + b"\x00")
-                h.update(file_path.read_bytes())
+                h.update(digest_target.read_bytes())
     else:
         h.update(skill_path.read_bytes())
     return h.hexdigest()
