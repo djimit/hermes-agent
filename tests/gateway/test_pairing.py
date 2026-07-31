@@ -118,6 +118,16 @@ class TestCodeGeneration:
         assert len(codes) == 3
 
 
+def test_platform_name_cannot_escape_pairing_directory(tmp_path):
+    store = _make_store(tmp_path)
+
+    with pytest.raises(ValueError, match="invalid platform name"):
+        store.generate_code("../../escape", "user")
+
+    assert not (tmp_path.parent / "escape-pending.json").exists()
+    assert store._pending_path("whatsapp_cloud") == tmp_path / "whatsapp_cloud-pending.json"
+
+
 # ---------------------------------------------------------------------------
 # Hashed storage
 # ---------------------------------------------------------------------------
@@ -676,5 +686,4 @@ class TestProfileScopedStorage:
             / "pairing"
             / "_rate_limits.json"
         )
-
 
