@@ -57,6 +57,8 @@ from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
 from urllib.parse import urlparse, parse_qs, urlunparse
 
+from agent.redact import redact_sensitive_text
+
 # NOTE: `from openai import OpenAI` is deliberately NOT at module top — the
 # openai SDK pulls a large type tree (~240 ms cold, including responses/*,
 # graders/*). We expose `OpenAI` here as a thin proxy that imports the SDK on
@@ -841,17 +843,29 @@ def _to_openai_base_url(base_url: str) -> str:
         # but /api/paas/v4 for OpenAI wire — the generic /v1 rewrite is wrong.
         if base_url_host_matches(url, "open.bigmodel.cn"):
             rewritten = url[: -len("/anthropic")] + "/paas/v4"
-            logger.debug("Auxiliary client: rewrote ZAI base URL %s → %s", url, rewritten)
+            logger.debug(
+                "Auxiliary client: rewrote ZAI base URL %s → %s",
+                redact_sensitive_text(url, force=True, redact_url_credentials=True),
+                redact_sensitive_text(rewritten, force=True, redact_url_credentials=True),
+            )
             return rewritten
         rewritten = url[: -len("/anthropic")] + "/v1"
-        logger.debug("Auxiliary client: rewrote base URL %s → %s", url, rewritten)
+        logger.debug(
+            "Auxiliary client: rewrote base URL %s → %s",
+            redact_sensitive_text(url, force=True, redact_url_credentials=True),
+            redact_sensitive_text(rewritten, force=True, redact_url_credentials=True),
+        )
         return rewritten
     if base_url_host_matches(url, "api.kimi.com") and url.endswith("/coding"):
         # Kimi Code uses /coding/v1/messages for Anthropic SDK (appends /v1/messages)
         # but /coding/v1/chat/completions for OpenAI SDK (appends /chat/completions)
         # Without /v1 here, OpenAI SDK hits /coding/chat/completions — a 404.
         rewritten = url + "/v1"
-        logger.debug("Auxiliary client: rewrote Kimi base URL %s → %s", url, rewritten)
+        logger.debug(
+            "Auxiliary client: rewrote Kimi base URL %s → %s",
+            redact_sensitive_text(url, force=True, redact_url_credentials=True),
+            redact_sensitive_text(rewritten, force=True, redact_url_credentials=True),
+        )
         return rewritten
     return url
 
