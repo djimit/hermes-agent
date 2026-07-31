@@ -20,6 +20,7 @@ from typing import Any, NamedTuple, Optional
 
 from hermes_cli import __version__ as _HERMES_VERSION
 from hermes_cli.urllib_security import open_credentialed_url
+from utils import base_url_host_matches
 
 # Identify ourselves so endpoints fronted by Cloudflare's Browser Integrity
 # Check (error 1010) don't reject the default ``Python-urllib/*`` signature.
@@ -3435,9 +3436,9 @@ def get_copilot_model_context(model_id: str, api_key: Optional[str] = None) -> O
 def _is_github_models_base_url(base_url: Optional[str]) -> bool:
     normalized = (base_url or "").strip().rstrip("/").lower()
     return (
-        normalized.startswith(COPILOT_BASE_URL)
-        or normalized.startswith("https://models.github.ai/inference")
-        or normalized.startswith("https://models.inference.ai.azure.com")
+        base_url_host_matches(normalized, "api.githubcopilot.com")
+        or base_url_host_matches(normalized, "models.github.ai")
+        or base_url_host_matches(normalized, "models.inference.ai.azure.com")
     )
 
 
