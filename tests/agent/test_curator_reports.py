@@ -72,6 +72,25 @@ def test_write_run_report_creates_both_files(curator_env):
     assert run_dir.parent == curator._reports_root()
 
 
+def test_write_run_report_redacts_secrets(curator_env):
+    curator = curator_env["curator"]
+    secret = "sk-proj-abcdefghijklmnopqrstuvwxyz123456"
+    run_dir = curator._write_run_report(
+        started_at=datetime.now(timezone.utc),
+        elapsed_seconds=1,
+        auto_counts={},
+        auto_summary="",
+        before_report=[],
+        before_names=set(),
+        after_report=[],
+        llm_meta=_make_llm_meta(final=secret, tool_calls=[{"api_key": secret}]),
+    )
+
+    assert run_dir is not None
+    assert secret not in (run_dir / "run.json").read_text()
+    assert secret not in (run_dir / "REPORT.md").read_text()
+
+
 
 
 
@@ -202,7 +221,6 @@ def test_curator_rewrites_cron_skills_when_skill_consolidated(curator_env_with_c
     assert "Cron job skill references rewritten" in md
     assert "foo-watcher" in md
     assert "foo-umbrella" in md
-
 
 
 
