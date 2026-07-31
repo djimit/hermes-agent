@@ -595,6 +595,11 @@ class TestProfileScopedStorage:
         # Auto-creates the directory
         assert expected.is_dir()
 
+    @pytest.mark.parametrize("profile", ["../escape", "nested/profile", r"nested\\profile", ".."])
+    def test_profile_store_rejects_path_like_profile_names(self, profile):
+        with pytest.raises(ValueError, match="Invalid profile name"):
+            PairingStore(profile=profile)
+
     def test_profile_store_matches_profile_cli_home(self, tmp_path, monkeypatch):
         """Gateway and ``hermes -p`` must resolve the same pairing store."""
         from hermes_constants import get_hermes_dir
@@ -686,4 +691,3 @@ class TestProfileScopedStorage:
             / "pairing"
             / "_rate_limits.json"
         )
-

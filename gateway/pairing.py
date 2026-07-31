@@ -261,6 +261,10 @@ class PairingStore:
         # Resolve storage directory lazily — tests use a temp HERMES_HOME
         # and PairingStore may be constructed before the env is set.
         if profile:
+            from hermes_cli.profiles import normalize_profile_name, validate_profile_name
+
+            profile = normalize_profile_name(profile)
+            validate_profile_name(profile)
             root = get_default_hermes_root()
             profile_home = (
                 root
