@@ -52,12 +52,26 @@ function proxyToApi(req, res) {
 }
 
 function serveStatic(req, res) {
-  const urlPath = req.url.split('?')[0];
-  let filePath = path.join(DIST_DIR, urlPath === '/' ? 'index.html' : urlPath);
+  const distRoot = path.resolve(DIST_DIR);
+  let urlPath;
+  try {
+    urlPath = decodeURIComponent(req.url.split('?')[0]);
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Invalid path');
+    return;
+  }
+  let filePath = path.resolve(distRoot, `.${urlPath === '/' ? '/index.html' : urlPath}`);
+  const relative = path.relative(distRoot, filePath);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found');
+    return;
+  }
 
   // SPA fallback: if file doesn't exist and isn't a static asset, serve index.html
   if (!fs.existsSync(filePath) && !path.extname(filePath)) {
-    filePath = path.join(DIST_DIR, 'index.html');
+    filePath = path.join(distRoot, 'index.html');
   }
 
   const ext = path.extname(filePath);
