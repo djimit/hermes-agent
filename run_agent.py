@@ -6360,7 +6360,10 @@ class AIAgent:
             or base_url_host_matches(base, "aiplatform.googleapis.com")
             # AWS Bedrock runtime endpoints — defense-in-depth when
             # ``provider`` is unset but ``base_url`` still names Bedrock.
-            or base_url_host_matches(base, "amazonaws.com")
+            or (
+                base_url_hostname(base).startswith("bedrock-runtime.")
+                and base_url_hostname(base).endswith(".amazonaws.com")
+            )
         )
 
     def _is_qwen_portal(self) -> bool:
