@@ -50,6 +50,11 @@ async function startTurnAndSwitchAway(page: import('@playwright/test').Page) {
   await composer.type('E2E_SIDEBAR_CROSS', { delay: 20 })
   await page.keyboard.press('Enter')
 
+  // Authorize the sentinel loop once when the shell guard requests it.
+  const run = page.locator('[data-slot="tool-approval-inline"]').getByRole('button', { name: /^Run/ })
+  await expect(run.or(page.getByLabel(BG_DOT_LABEL)).first()).toBeVisible({ timeout: 30_000 })
+  if (await run.isVisible()) await run.click()
+
   // Wait for the user's message to appear.
   await page.waitForFunction(
     () => (document.body.textContent ?? '').includes('E2E_SIDEBAR_CROSS'),
