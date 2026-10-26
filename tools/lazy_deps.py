@@ -121,8 +121,8 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # monitoring.gateway_health_export / monitoring.export.otlp. Tracks the
     # `otlp` extra in pyproject.toml — bump both together.
     "export.otlp": (
-        "opentelemetry-sdk==1.39.1",
-        "opentelemetry-exporter-otlp-proto-http==1.39.1",
+        "opentelemetry-sdk==1.45.1",
+        "opentelemetry-exporter-otlp-proto-http==1.45.1",
     ),
 
     # ─── TTS providers ─────────────────────────────────────────────────────
@@ -134,12 +134,12 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # quarantined the project 2026-05-12 (malicious 2.4.6, Mini Shai-Hulud);
     # 2.4.6 was removed and clean releases resumed (2.4.7, 2.4.8). Voxtral
     # STT + TTS share the same SDK.
-    "tts.mistral": ("mistralai==2.4.8",),
+    "tts.mistral": ("mistralai==2.9.2",),
     "tts.edge": ("edge-tts==7.2.7",),
     "tts.elevenlabs": ("elevenlabs==1.59.0",),
 
     # ─── Speech-to-text providers ──────────────────────────────────────────
-    "stt.mistral": ("mistralai==2.4.8",),
+    "stt.mistral": ("mistralai==2.9.2",),
     "stt.faster_whisper": (
         "faster-whisper==1.2.1",
         "sounddevice==0.5.5",
@@ -284,7 +284,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     # `[all]`; lazy-installing here covers lean / partial / broken-extra
     # installs so computer_use never dead-ends on `No module named 'mcp'`.
     "tool.computer_use": (
-        "mcp==1.29.0",
+        "mcp==1.30.0",
         "starlette==1.3.1",  # CVE-2026-48710 — keep in sync with pyproject [computer-use]
     ),
     # HF Agent Trace Viewer upload (hermes trace upload / /upload-trace).
