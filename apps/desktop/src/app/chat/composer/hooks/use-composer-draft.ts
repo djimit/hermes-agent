@@ -1,4 +1,4 @@
-import { useAui, useAuiState, useComposerRuntime } from '@assistant-ui/react'
+import { useAui, useAuiState } from '@assistant-ui/react'
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { SLASH_COMMAND_RE } from '@/lib/chat-runtime'
@@ -58,7 +58,8 @@ export function useComposerDraft({
   sessionId
 }: UseComposerDraftArgs) {
   const aui = useAui()
-  const composerRuntime = useComposerRuntime()
+  // Preserve the narrow draft subscription; the client also observes streaming messages.
+  const composerRuntime = aui.composer().__internal_getRuntime!()
   // Which composer this is on the focus bus + which attachment set it owns.
   const { attachments: attachmentScope, target } = useComposerScope()
 

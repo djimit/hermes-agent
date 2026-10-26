@@ -10,15 +10,17 @@ import { type ComposerScope, ComposerScopeProvider, MAIN_COMPOSER_SCOPE } from '
 
 import { useComposerDraft } from './use-composer-draft'
 
-const mockComposerApi = { setText: vi.fn() }
-
-vi.mock('@assistant-ui/react', () => ({
-  useAui: () => ({ composer: () => mockComposerApi }),
-  useAuiState: (selector: (state: { composer: { text: string } }) => unknown) => selector({ composer: { text: '' } }),
-  useComposerRuntime: () => ({
+const mockComposerApi = {
+  setText: vi.fn(),
+  __internal_getRuntime: () => ({
     getState: () => ({ text: '' }),
     subscribe: () => () => undefined
   })
+}
+
+vi.mock('@assistant-ui/react', () => ({
+  useAui: () => ({ composer: () => mockComposerApi }),
+  useAuiState: (selector: (state: { composer: { text: string } }) => unknown) => selector({ composer: { text: '' } })
 }))
 
 interface ProbeHarnessProps {
