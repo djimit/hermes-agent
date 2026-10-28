@@ -1,9 +1,50 @@
 """Tests for the Mistral (Voxtral) TTS provider in tools/tts_tool.py."""
 
 import base64
+import importlib.util
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+
+
+def test_real_mistral_sdk_speech_and_transcription(monkeypatch, tmp_path):
+    import httpx
+
+    if importlib.util.find_spec("mistralai") is None:
+        pytest.skip("mistralai extra not installed")
+    import mistralai.client as sdk
+    from tools.transcription_tools import _transcribe_mistral
+    from tools.tts_tool import _generate_mistral_tts
+
+    real_client = sdk.Mistral
+    requests = []
+
+    def respond(request):
+        requests.append(request)
+        assert request.url.host == "mistral.invalid"
+        if request.url.path == "/v1/audio/speech":
+            assert json.loads(request.content)["input"] == "Hello world"
+            return httpx.Response(200, json={"audio_data": base64.b64encode(b"audio").decode()})
+        assert request.url.path == "/v1/audio/transcriptions"
+        assert b"voxtral-mini-latest" in request.content
+        return httpx.Response(200, json={
+            "model": "voxtral-mini-latest", "text": "Hello world", "usage": {}, "language": "en",
+        })
+
+    def local_client(**kwargs):
+        kwargs.setdefault("server_url", "https://mistral.invalid")
+        return real_client(client=httpx.Client(transport=httpx.MockTransport(respond)), **kwargs)
+
+    monkeypatch.setattr(sdk, "Mistral", local_client)
+    monkeypatch.setenv("MISTRAL_API_KEY", "local-sdk-compatibility")
+    output = tmp_path / "speech.mp3"
+    _generate_mistral_tts("Hello world", str(output), {"mistral": {"base_url": "https://mistral.invalid"}})
+    assert output.read_bytes() == b"audio"
+    result = _transcribe_mistral(str(output), "voxtral-mini-latest")
+    assert result["success"] is True
+    assert result["transcript"] == "Hello world"
+    assert len(requests) == 2
 
 
 @pytest.fixture(autouse=True)
