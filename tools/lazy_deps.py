@@ -184,7 +184,7 @@ LAZY_DEPS: dict[str, tuple[str, ...]] = {
     ),
 
     # ─── Image generation backends ─────────────────────────────────────────
-    "image.fal": ("fal-client==0.13.1",),
+    "image.fal": ("fal-client==0.13.1", "msgpack==1.2.3"),
 
     # ─── Memory providers ──────────────────────────────────────────────────
     "memory.honcho": ("honcho-ai==2.2.0",),
