@@ -1,8 +1,35 @@
-import { fromThreadMessageLike, getAutoStatus, MessageRepository } from '@assistant-ui/core/internal'
+import {
+  AssistantRuntimeImpl,
+  ExternalStoreRuntimeCore,
+  fromThreadMessageLike,
+  getAutoStatus,
+  MessageRepository
+} from '@assistant-ui/core/internal'
 import type { ExportedMessageRepository, ThreadMessage } from '@assistant-ui/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { syncRepositoryIncrementally } from './incremental-external-store-runtime'
+
+it('keeps subscribed thread-list snapshots stable until the adapter changes', () => {
+  const adapter = { messages: [], isRunning: false, onNew: async () => {} }
+  const core = new ExternalStoreRuntimeCore(adapter)
+  const runtime = new AssistantRuntimeImpl(core)
+  const unsubscribe = runtime.threads.subscribe(() => {})
+
+  try {
+    const before = runtime.threads.getState()
+
+    expect(runtime.threads.getState()).toBe(before)
+    core.setAdapter({ ...adapter, adapters: { threadList: { isLoading: true } } })
+    const after = runtime.threads.getState()
+
+    expect(after.isLoading).toBe(true)
+    expect(after).not.toBe(before)
+    expect(runtime.threads.getState()).toBe(after)
+  } finally {
+    unsubscribe()
+  }
+})
 
 const STATUS = getAutoStatus(false, false, false, false, undefined)
 
