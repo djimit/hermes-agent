@@ -160,9 +160,11 @@ export function useDesktopIntegrations({
       }
 
       const command = blueprintCommand(payload.name, payload.params || {})
+
       if (!command) {
         return
       }
+
       requestComposerInsert(command, { mode: 'block', target: 'main' })
       requestComposerFocus('main')
     })
